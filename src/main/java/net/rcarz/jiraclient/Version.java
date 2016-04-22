@@ -20,11 +20,13 @@
 package net.rcarz.jiraclient;
 
 import net.sf.json.JSON;
+import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,20 +34,85 @@ import java.util.Map;
  */
 public class Version extends Resource {
 
-    /**
-     * Used to chain fields to a create action.
-     */
-    public static final class FluentCreate {
-        /**
-         * The Jira rest client.
-         */
-        RestClient restclient = null;
+    public static abstract class AbstractFluent
+    {
+
 
         /**
          * The JSON request that will be built incrementally as fluent methods
          * are invoked.
          */
         JSONObject req = new JSONObject();
+
+        /**
+         * Sets the name of the version.
+         * @param name the name
+         * @return <code>this</code>
+         */
+        public AbstractFluent name(String name) {
+            req.put("name", name);
+            return this;
+        }
+
+        /**
+         * Sets the description of the version.
+         * @param description the description
+         * @return <code>this</code>
+         */
+        public AbstractFluent description(String description) {
+            req.put("description", description);
+            return this;
+        }
+
+        /**
+         * Sets the archived status of the version.
+         * @param isArchived archived status
+         * @return <code>this</code>
+         */
+        public AbstractFluent archived(boolean isArchived) {
+            req.put("archived", isArchived);
+            return this;
+        }
+
+        /**
+         * Sets the released status of the version.
+         * @param isReleased released status
+         * @return <code>this</code>
+         */
+        public AbstractFluent released(boolean isReleased) {
+            req.put("released", isReleased);
+            return this;
+        }
+
+        /**
+         * Sets the release date of the version.
+         * @param releaseDate release Date
+         * @return <code>this</code>
+         */
+        public AbstractFluent releaseDate(Date releaseDate) {
+            if( releaseDate != null )
+            {
+                DateFormat df = new SimpleDateFormat("MM/dd/yyyy");
+                req.put("releaseDate", df.format(releaseDate));
+            }
+            else
+            {
+                req.put("releaseDate", JSONNull.getInstance());
+            }
+            return this;
+        }
+
+        public abstract Version execute() throws JiraException;
+    }
+
+    /**
+     * Used to chain fields to a create action.
+     */
+    public static final class FluentCreate extends AbstractFluent{
+        /**
+         * The Jira rest client.
+         */
+        RestClient restclient = null;
 
         /**
          * Creates a new fluent.
@@ -56,60 +123,6 @@ public class Version extends Resource {
             this.restclient = restclient;
             req.put("project", project);
         }
-
-        /**
-         * Sets the name of the version.
-         * @param name the name
-         * @return <code>this</code>
-         */
-        public FluentCreate name(String name) {
-            req.put("name", name);
-            return this;
-        }
-
-        /**
-         * Sets the description of the version.
-         * @param description the description
-         * @return <code>this</code>
-         */
-        public FluentCreate description(String description) {
-            req.put("description", description);
-            return this;
-        }
-
-        /**
-         * Sets the archived status of the version.
-         * @param isArchived archived status
-         * @return <code>this</code>
-         */
-        public FluentCreate archived(boolean isArchived) {
-            req.put("archived", isArchived);
-            return this;
-        }
-
-        /**
-         * Sets the released status of the version.
-         * @param isReleased released status
-         * @return <code>this</code>
-         */
-        public FluentCreate released(boolean isReleased) {
-            req.put("released", isReleased);
-            return this;
-        }
-
-        /**
-         * Sets the release date of the version.
-         * @param releaseDate release Date
-         * @return <code>this</code>
-         */
-        public FluentCreate releaseDate(Date releaseDate) {
-            DateFormat df = new SimpleDateFormat("MM/dd/yyyy");
-            req.put("releaseDate", df.format(releaseDate));
-            return this;
-        }
-
-
-
 
         /**
          * Executes the create action.
@@ -124,6 +137,33 @@ public class Version extends Resource {
                 result = restclient.post(getRestUri(null), req);
             } catch (Exception ex) {
                 throw new JiraException("Failed to create version", ex);
+            }
+
+            if (!(result instanceof JSONObject) || !((JSONObject) result).containsKey("id")
+                    || !(((JSONObject) result).get("id") instanceof String)) {
+                throw new JiraException("Unexpected result on create version");
+            }
+
+            return new Version(restclient, (JSONObject) result);
+        }
+    }
+
+    public final class FluentUpdate extends AbstractFluent
+    {
+
+        /**
+         * Executes the update action.
+         * @return the updated Version
+         *
+         * @throws JiraException when the create fails
+         */
+        public Version execute() throws JiraException {
+            JSON result = null;
+
+            try {
+                result = restclient.put(getRestUri(id), req);
+            } catch (Exception ex) {
+                throw new JiraException("Failed to update version", ex);
             }
 
             if (!(result instanceof JSONObject) || !((JSONObject) result).containsKey("id")
@@ -278,6 +318,32 @@ public class Version extends Resource {
     public static FluentCreate create(RestClient restclient, String project) {
         FluentCreate fc = new FluentCreate(restclient, project);
         return fc;
+    }
+
+    /**
+     * Deletes the version
+     *
+     * @throws JiraException failed to delete the version
+     */
+    public void delete() throws  JiraException
+    {
+        try {
+            restclient.delete(getRestUri(getId()));
+        } catch (Exception ex) {
+            throw new JiraException("Failed to delete version " + id, ex);
+        }
+    }
+
+
+    /**
+     * Begins an update field chain.
+     *
+     * @return a fluent update instance
+     *
+     * @throws JiraException when the client fails to retrieve issue metadata
+     */
+    public FluentUpdate update() throws JiraException {
+        return new FluentUpdate();
     }
 }
 

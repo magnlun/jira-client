@@ -3,9 +3,13 @@ package net.rcarz.jiraclient;
 import net.sf.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+
+import java.util.Date;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -109,6 +113,34 @@ public class VersionTest {
         version.copyTo(new Project(mockRestClient,mockJSON));
     }
 
+    @Test
+    public void updateIssue() throws Exception {
+        final RestClient mockRestClient = PowerMockito.mock(RestClient.class);
+        when( mockRestClient.put( anyString(), any(JSONObject.class) ) ).thenAnswer(new Answer<JSONObject>() {
+            @Override
+            public JSONObject answer(InvocationOnMock invocation) throws Throwable {
+                Object[] args = invocation.getArguments();
+                JSONObject object = (JSONObject) args[1];
+                object.put("id", "123");
+                return object;
+            }
+        });
+        Version version = new Version(mockRestClient, Utils.getTestVersion());
+        Date date = new Date();
+
+        Version version2 = version.update()
+                .description( "afterDesc" )
+                .name( "afterName" )
+                .archived( true )
+                .released( false )
+                .releaseDate( date )
+                .execute();
+
+        assertEquals( version2.getName(),"afterName" );
+        assertEquals( version2.getDescription(),"afterDesc" );
+        assertEquals( version2.isArchived(),true );
+        assertEquals( version2.isReleased(),false );
+    }
 
     @Test
     public void testToString() throws Exception {
